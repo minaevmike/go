@@ -31,7 +31,7 @@ import (
 	"unicode/utf8"
 )
 
-var debug = debugT(false)
+var debug = debugT(true)
 
 type debugT bool
 
@@ -253,7 +253,9 @@ func (p *addrParser) parseAddressList() ([]*Address, error) {
 		}
 		list = append(list, addr)
 
-		p.skipSpace()
+		if !p.skipCfws() {
+			return nil, fmt.Errorf("mail: can't skip cfws, qot %q", p.s)
+		}
 		if p.empty() {
 			break
 		}
@@ -269,7 +271,9 @@ func (p *addrParser) parseSingleAddress() (*Address, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.skipSpace()
+	if !p.skipCfws() {
+		return nil, fmt.Errorf("mail: can't skip cfws, qot %q", p.s)
+	}
 	if !p.empty() {
 		return nil, fmt.Errorf("mail: expected single address, got %q", p.s)
 	}
@@ -545,6 +549,47 @@ func (p *addrParser) empty() bool {
 
 func (p *addrParser) len() int {
 	return len(p.s)
+}
+
+// skipCfws skips CFWS as defined in RFC5322
+func (p *addrParser) skipCfws() bool {
+	p.skipSpace()
+
+	for {
+		if p.empty() || !p.consume('(') {
+			break
+		}
+
+		if !p.skipComment() {
+			return false
+		}
+
+		p.skipSpace()
+	}
+
+	return true
+}
+
+func (p *addrParser) skipComment() bool {
+	// '(' already consumed
+	depth := 1
+
+	for {
+		if p.empty() || depth == 0 {
+			break
+		}
+
+		if p.peek() == '\\' && p.len() > 1 {
+			p.s = p.s[1:]
+		} else if p.peek() == '(' {
+			depth++
+		} else if p.peek() == ')' {
+			depth--
+		}
+		p.s = p.s[1:]
+	}
+
+	return depth == 0
 }
 
 func (p *addrParser) decodeRFC2047Word(s string) (word string, isEncoded bool, err error) {

@@ -137,6 +137,7 @@ func TestAddressParsingError(t *testing.T) {
 		5: {"\"\x00\" <null@example.net>", "bad character in quoted-string"},
 		6: {"\"\\\x00\" <escaped-null@example.net>", "bad character in quoted-string"},
 		7: {"John Doe", "no angle-addr"},
+		8: {"cfws@example.com (", "mail: can't skip cfws"},
 	}
 
 	for i, tc := range mustErrTestCases {
@@ -333,6 +334,29 @@ func TestAddressParsing(t *testing.T) {
 				{
 					Name:    "",
 					Address: "emptystring@example.com",
+				},
+			},
+		},
+		// CFWS
+		{
+			`cfws@example.com (CFWS (cfws))  (another comment)`,
+			[]*Address{
+				{
+					Name: "",
+					Address: "cfws@example.com",
+				},
+			},
+		},
+		{
+			`cfws@example.com ()  (another comment), cfws2@example.com (another)`,
+			[]*Address{
+				{
+					Name: "",
+					Address: "cfws@example.com",
+				},
+				{
+					Name: "",
+					Address: "cfws2@example.com",
 				},
 			},
 		},
